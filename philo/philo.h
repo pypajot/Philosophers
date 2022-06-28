@@ -27,6 +27,7 @@ typedef struct s_data {
 	int				timetoeat;
 	int				timetosleep;
 	int				mealnbr;
+	int				*mealcount;
 	int				*forktab;
 	int				philid;
 	long			t_zero;
@@ -38,6 +39,7 @@ typedef struct s_data {
 	pthread_mutex_t display;
 	pthread_mutex_t idmutex;
 	pthread_mutex_t lasteatmutex;
+	pthread_mutex_t meals;
 }		t_data;
 
 #endif
