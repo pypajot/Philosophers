@@ -50,7 +50,7 @@ void	*philo(void *arg)
 		pthread_mutex_lock(&data->forkmutex[((id / 2) * 2) % data->philnbr]);
 		if (data->forktab[((id / 2) * 2) % data->philnbr] && eat_sleep_think == 1)
 		{			
-			data->forktab[id] = 0;
+			data->forktab[((id / 2) * 2) % data->philnbr] = 0;
 			pthread_mutex_unlock(&data->forkmutex[((id / 2) * 2) % data->philnbr]);
 			display(data->t_zero, id, data->display, "has taken a fork");
 			gettimeofday(&tv, 0);
@@ -90,11 +90,12 @@ int	check_end(void *arg)
 	usleep(100);
 	while (1)
 	{
-		i = 0;
-		while (i < 2)
+		i = -1;
+		while (++i < data->philnbr)
 		{
-			gettimeofday(&tv, 0);
+			
 			pthread_mutex_lock(&data->lasteatmutex);
+			gettimeofday(&tv, 0);
 			if (tv.tv_sec * 1000 + tv.tv_usec / 1000 - data->lasteat[i] > data->timetodie)
 			{
 				pthread_mutex_lock(&data->display);
@@ -102,7 +103,7 @@ int	check_end(void *arg)
 				pthread_mutex_lock(&data->endmutex);
 				data->end = 0;
 				pthread_mutex_unlock(&data->endmutex);
-				pthread_mutex_unlock(&data->display);
+				//pthread_mutex_unlock(&data->display);
 				pthread_mutex_unlock(&data->lasteatmutex);
 				return (0);
 			}
@@ -148,8 +149,7 @@ int	check_av(int ac, char **av)
 		if (!check_arg(av[i]))
 			return (0);
 		if (i == 1 && !ft_atoi(av[i]))
-			return (0);
-			
+			return (0);	
 	}
 	return (1);
 }
@@ -186,9 +186,6 @@ t_data	init_data(int ac, char **av)
 
 int	main(int ac, char **av)
 {
-	
-	
-	
 	t_data data;
 	data = init_data(ac, av);
 	pthread_mutex_init(&data.display, 0);
@@ -203,11 +200,10 @@ int	main(int ac, char **av)
 		usleep(10);
 		i++;
 	}
-	
 	if (check_end(&data) == 0)
 	{
 		i = -1;
-		while (++i < 2)
+		while (++i < data.philnbr)
 			pthread_join(data.tid[i], NULL);
 		free(data.lasteat);
 		return (0);	
