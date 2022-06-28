@@ -28,12 +28,12 @@ typedef struct s_data {
 	int				timetosleep;
 	int				mealnbr;
 	int				*forktab;
-	
+	int				philid;
 	long			t_zero;
 	pthread_t 		*tid;
 	long			*lasteat;
 	int				end;
-	pthread_mutex_t forkmutex;
+	pthread_mutex_t *forkmutex;
 	pthread_mutex_t endmutex;
 	pthread_mutex_t display;
 	pthread_mutex_t idmutex;

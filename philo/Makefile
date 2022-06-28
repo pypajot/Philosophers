@@ -17,7 +17,7 @@ all : $(NAME)
 
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c $(INC)
-	@mkdir -p $(OBJDIR)
+	mkdir -p $(OBJDIR)
 	$(CC) $(FLAGS) -c $< -o $@
 
 
@@ -38,7 +38,6 @@ re:
 	make all
 
 
-bonus: all
+.PHONY: clean fclean re all
 
-
-.PHONY: clean fclean re all bonus
+.SILENT:
