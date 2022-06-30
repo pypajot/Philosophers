@@ -6,11 +6,21 @@
 /*   By: ppajot <ppajot@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/06/25 20:24:04 by ppajot            #+#    #+#             */
-/*   Updated: 2022/06/29 20:08:32 by ppajot           ###   ########.fr       */
+/*   Updated: 2022/06/30 20:36:31 by ppajot           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../philo.h"
+
+int	ft_strlen(char *str)
+{
+	int	i;
+
+	i = 0;
+	while (str[i])
+		i++;
+	return (i);
+}
 
 int	ft_strcmp(char *str1, char *str2)
 {
@@ -22,34 +32,45 @@ int	ft_strcmp(char *str1, char *str2)
 	return (*str1 - *str2);
 }
 
-void	display(long t_zero, int id, pthread_mutex_t *displaymutex, char *str)
+int	display(long t_zero, int id, t_philo *philo, char *str)
 {
 	struct timeval	tv;
+	int				i;
 
+	i = ft_strcmp(str, "died\n");
+	pthread_mutex_lock(philo->display);
+	if (!(*philo->end))
+		return (pthread_mutex_unlock(philo->display), 0);
 	gettimeofday(&tv, 0);
-	pthread_mutex_lock(displaymutex);
-	printf("%li %i %s\n", tv.tv_sec * 1000 + tv.tv_usec / 1000 - t_zero,
+	printf("%li %i %s", tv.tv_sec * 1000 + tv.tv_usec / 1000 - t_zero,
 		id, str);
-	if (ft_strcmp(str, "died"))
-		pthread_mutex_unlock(displaymutex);
+	if (i == 0)
+		*philo->end = 0;
+	pthread_mutex_unlock(philo->display);
+	return (1);
 }
 
-void	takes_put_fork(t_data *data, int id, int forknbr, int takes_put)
+int	takes_fork(t_philo *philo, int id, int forknbr)
 {
-	int	fork;
-
 	if (forknbr == 2)
-		fork = ((id / 2) * 2) % data->philnbr;
+		pthread_mutex_lock(philo->fork2);
 	else
-		fork = (((id - 1) / 2) * 2 + 1) % data->philnbr;
-	pthread_mutex_lock(&data->forkmutex[fork]);
-	data->forktab[fork] = takes_put;
-	pthread_mutex_unlock(&data->forkmutex[fork]);
-	if (takes_put == 0)
-		display(data->t_zero, id, &data->display, "has taken a fork");
+		pthread_mutex_lock(philo->fork1);
+	if (!display(*philo->t_zero, id, philo, "has taken a fork\n"))
+	{
+		if (forknbr == 2)
+		{
+			pthread_mutex_unlock(philo->fork2);
+			pthread_mutex_unlock(philo->fork1);
+		}
+		else
+			pthread_mutex_unlock(philo->fork1);
+		return (0);
+	}
+	return (1);
 }
 
-int	check_fork(t_data *data, int id, int forknbr)
+/*int	check_fork(t_data *data, int id, int forknbr)
 {
 	int	res;
 	int	fork;
@@ -66,126 +87,114 @@ int	check_fork(t_data *data, int id, int forknbr)
 	pthread_mutex_unlock(&data->forkmutex[fork]);
 	return (res);
 }
-
-int	check_last_eat(t_data *data, int i)
+*/
+int	check_last_eat(t_philo *philo)
 {
 	int				res;
 	struct timeval	tv;
 
-	pthread_mutex_lock(&data->lasteatmutex);
+	pthread_mutex_lock(&philo->lasteatmutex);
 	gettimeofday(&tv, 0);
-	if (tv.tv_sec * 1000 + tv.tv_usec / 1000 - data->lasteat[i]
-		> data->timetodie)
+	if (tv.tv_sec * 1000 + tv.tv_usec / 1000 - philo->lasteat > philo->timetodie)
 		res = 1;
 	else
 		res = 0;
-	pthread_mutex_unlock(&data->lasteatmutex);
+	pthread_mutex_unlock(&philo->lasteatmutex);
 	return (res);
 }
 
-int	check_end(t_data *data)
+int	think(t_philo *philo, int id)
 {
-	int	res;
-
-	pthread_mutex_lock(&data->endmutex);
-	if (data->end)
-		res = 1;
-	else if (!data->end)
-		res = 0;
-	pthread_mutex_unlock(&data->endmutex);
-	return (res);
+	if (!display(*philo->t_zero, id, philo, "is thinking\n"))
+		return (0);
+	return (1);
 }
 
-void	think(t_data *data, int id, int *eat_sleep_think)
+int	ft_sleep(t_philo *philo, int id)
 {
-	display(data->t_zero, id, &data->display, "is thinking");
-	*eat_sleep_think = 0;
+	if (!display(*philo->t_zero, id, philo, "is sleeping\n"))
+		return (0);
+	usleep(philo->timetosleep * 1000);
+	return (1);
 }
 
-void	ft_sleep(t_data *data, int id, int *eat_sleep_think)
-{
-	display(data->t_zero, id, &data->display, "is sleeping");
-	usleep(data->timetosleep * 1000);
-	*eat_sleep_think = 3;
-}
-
-void	eat(t_data *data, int id, int *eat_sleep_think)
+int	eat(t_philo *philo, int id)
 {
 	struct timeval	tv;
+	int res;
 
-	takes_put_fork(data, id, 2, 0);
-	pthread_mutex_lock(&data->lasteatmutex);
+	res = 1;
+	pthread_mutex_lock(&philo->lasteatmutex);
 	gettimeofday(&tv, 0);
-	data->lasteat[id - 1] = tv.tv_sec * 1000 + tv.tv_usec / 1000;
-	pthread_mutex_unlock(&data->lasteatmutex);
-	display(data->t_zero, id, &data->display, "is eating");
-	pthread_mutex_lock(&data->meals);
-	data->mealcount[id - 1]++;
-	pthread_mutex_unlock(&data->meals);
-	usleep(data->timetoeat * 1000);
-	takes_put_fork(data, id, 1, 1);
-	takes_put_fork(data, id, 2, 1);
-	*eat_sleep_think = 2;
+	philo->lasteat = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+	pthread_mutex_unlock(&philo->lasteatmutex);
+	if (!display(*philo->t_zero, id, philo, "is eating\n"))
+		res = 0;
+	pthread_mutex_lock(&philo->meals);
+	philo->mealcount++;
+	pthread_mutex_unlock(&philo->meals);
+	usleep(philo->timetoeat * 1000);
+	pthread_mutex_unlock(philo->fork2);
+	pthread_mutex_unlock(philo->fork1);
+	return (res);
 }
 
-void	*philo(void *arg)
+void	*philo_live(void *arg)
 {
-	t_data	*data;
-	int		eat_sleep_think;
-	int		id;
+	t_philo	*philo;
 
-	data = (t_data *)arg;
-	eat_sleep_think = 0;
-	pthread_mutex_lock(&data->idmutex);
-	id = ++data->philid;
-	pthread_mutex_unlock(&data->idmutex);
-	while (check_end(data))
+	philo = (t_philo *)arg;
+	pthread_mutex_lock(philo->start);
+	pthread_mutex_unlock(philo->start);
+	if (!(philo->id % 2))
+		usleep((philo->timetoeat - 1) * 1000);
+	else
+		usleep(philo->id * 2);
+	while (1)
 	{
-		if (eat_sleep_think == 3)
-			think(data, id, &eat_sleep_think);
-		else if (eat_sleep_think == 2)
-			ft_sleep(data, id, &eat_sleep_think);
-		else if (eat_sleep_think == 1 && check_fork(data, id, 2))
-			eat(data, id, &eat_sleep_think);
-		else if (eat_sleep_think == 0 && check_fork(data, id, 1))
-		{
-			takes_put_fork(data, id, 1, 0);
-			eat_sleep_think = 1;
-		}		
+		if (!takes_fork(philo, philo->id, 1))
+			return (0);
+		if (!takes_fork(philo, philo->id, 2))
+			return (0);
+		if(!eat(philo, philo->id))
+			return (0);
+		if (!ft_sleep(philo, philo->id))
+			return (0);
+		if (!think(philo, philo->id))
+			return (0);
 	}
 	return (0);
 }
 
 void	zero_end(t_data *data)
 {
-	pthread_mutex_lock(&data->endmutex);
+	pthread_mutex_lock(&data->display);
 	data->end = 0;
-	pthread_mutex_unlock(&data->endmutex);
+	pthread_mutex_unlock(&data->display);
 }
 
-int	ender(void *arg)
+int	ender(t_data *data, t_philo *philo)
 {
-	t_data	*data;
 	int		i;
 	int		counter;
 
-	data = (t_data *)arg;
+	usleep(data->timetodie * 250);
 	while (1)
 	{
 		i = -1;
 		counter = 0;
 		while (++i < data->philnbr)
 		{
-			pthread_mutex_lock(&data->meals);
+			pthread_mutex_lock(&philo[i].meals);
 			if (data->mealcount[i] >= data->mealnbr)
 				counter++;
-			pthread_mutex_unlock(&data->meals);
+			pthread_mutex_unlock(&philo[i].meals);
 			if (counter == data->philnbr)
 				return (zero_end(data), 0);
-			if (check_last_eat(data, i))
+			if (check_last_eat(&philo[i]))
 			{
-				display(data->t_zero, i + 1, &data->display, "died");
-				return (zero_end(data), 0);
+				display(data->t_zero, i + 1, &philo[i], "died\n");
+				return (0);
 			}
 		}
 	}
@@ -235,23 +244,30 @@ int	check_av(int ac, char **av)
 
 void	free_data(t_data *data)
 {
-	free(data->forktab);
+	int	i;
+
+	i = -1;
+	pthread_mutex_destroy(&data->display);	
+	while (++i < data->philnbr)
+	{
+		pthread_mutex_destroy(&data->philo[i].lasteatmutex);
+		pthread_mutex_destroy(&data->philo[i].meals);
+		pthread_mutex_destroy(&data->forkmutex[i]);
+	}
+	free(data->philo);
 	free(data->mealcount);
 	free(data->tid);
-	free(data->lasteat);
 	free(data->forkmutex);
 }
 
 int	alloc_data(t_data *data)
 {
-	data->forktab = (int *)malloc(sizeof(int) * data->philnbr);
+	data->philo = (t_philo *)malloc(sizeof(t_philo) * data->philnbr);
 	data->mealcount = (int *)malloc(sizeof(int) * data->philnbr);
 	data->tid = (pthread_t *)malloc(sizeof(pthread_t) * data->philnbr);
-	data->lasteat = (long *)malloc(sizeof(long) * data->philnbr);
 	data->forkmutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t)
 			* data->philnbr);
-	if (!data->forktab || !data->mealcount || !data->tid || !data->lasteat
-		|| !data->forkmutex)
+	if (!data->mealcount || !data->tid || !data->forkmutex)
 		return (free_data(data), 0);
 	return (1);
 }
@@ -273,6 +289,25 @@ void	init_base_data(int ac, char **av, t_data *data)
 		data->mealnbr = 2147483647;
 }
 
+void	init_philo(t_data *data, t_philo *philo, int i)
+{
+	philo->id = i + 1;
+	philo->lasteat = data->t_zero;
+	philo->t_zero = &data->t_zero;
+	philo->mealcount = 0;
+	philo->timetodie = data->timetodie;
+	philo->timetoeat = data->timetoeat;
+	philo->timetosleep = data->timetosleep;
+	philo->end = &data->end;
+	pthread_mutex_init(&philo->lasteatmutex, 0);
+	pthread_mutex_init(&philo->meals, 0);
+	philo->display = &data->display;
+	philo->start = &data->start;	
+	philo->fork1 = &data->forkmutex[((i / 2) * 2 + 1) % data->philnbr];
+	philo->fork2 = &data->forkmutex[(((i + 1) / 2) * 2) % data->philnbr];
+	
+}
+
 int	init_data(int ac, char **av, t_data *data)
 {
 	int	i;
@@ -281,19 +316,29 @@ int	init_data(int ac, char **av, t_data *data)
 	if (!alloc_data(data))
 		return (0);
 	i = -1;
-	while (++i < data->philnbr)
-	{
-		data->mealcount[i] = 0;
-		data->forktab[i] = 1;
-		pthread_mutex_init(&data->forkmutex[i], 0);
-		data->lasteat[i] = data->t_zero;
-	}
 	pthread_mutex_init(&data->display, 0);
-	pthread_mutex_init(&data->lasteatmutex, 0);
-	pthread_mutex_init(&data->idmutex, 0);
-	pthread_mutex_init(&data->endmutex, 0);
-	pthread_mutex_init(&data->meals, 0);
+	pthread_mutex_init(&data->start, 0);
+	while (++i < data->philnbr)
+	{	
+		data->mealcount[i] = 0;
+		pthread_mutex_init(&data->forkmutex[i], 0);
+	}
+	i = -1;
+	while (++i < data->philnbr)
+		init_philo(data, &data->philo[i], i);	
 	return (1);
+}
+
+void	init_t_zero(t_data *data)
+{
+	struct timeval	tv;
+	int				i;
+
+	i = -1;
+	gettimeofday(&tv, 0);
+	data->t_zero = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+	while (++i < data->philnbr)
+		data->philo[i].lasteat = data->t_zero;
 }
 
 int	main(int ac, char **av)
@@ -305,22 +350,18 @@ int	main(int ac, char **av)
 		return (0);
 	if (!init_data(ac, av, &data))
 		return (0);
-	i = 0;
-	data.philid = 0;
-	while (i < data.philnbr)
-	{			
-		pthread_create(&data.tid[i], NULL, philo, &data);
-		usleep(50);
-		i++;
-	}
-	if (ender(&data) == 0)
+	i = -1;
+	pthread_mutex_lock(&data.start);
+	init_t_zero(&data);
+	pthread_mutex_unlock(&data.start);
+	while (++i < data.philnbr)		
+		pthread_create(&data.tid[i], NULL, philo_live, &data.philo[i]);
+	if (ender(&data, data.philo) == 0)
 	{
 		i = -1;
-		pthread_mutex_unlock(&data.display);
 		while (++i < data.philnbr)
 			pthread_join(data.tid[i], NULL);
 		free_data(&data);
-		return (0);
 	}
 	return (0);
 }

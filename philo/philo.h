@@ -6,7 +6,7 @@
 /*   By: ppajot <ppajot@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/06/25 20:22:37 by ppajot            #+#    #+#             */
-/*   Updated: 2022/06/29 20:08:16 by ppajot           ###   ########.fr       */
+/*   Updated: 2022/06/30 20:30:19 by ppajot           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,25 +19,40 @@
 # include <stdlib.h>
 # include <sys/time.h>
 
-typedef struct s_data {
+typedef struct s_philo
+{
+	int				id;
+	long			lasteat;
+	long			*t_zero;
+	int				mealcount;
+	int				timetodie;
+	int				timetoeat;
+	int				timetosleep;
+	int				*end;
+	pthread_mutex_t	lasteatmutex;
+	pthread_mutex_t	meals;
+	pthread_mutex_t	*fork1;
+	pthread_mutex_t	*fork2;
+	pthread_mutex_t	*display;
+	pthread_mutex_t	*start;
+}		t_philo;
+
+
+typedef struct s_data
+{
 	int				philnbr;
 	int				timetodie;
 	int				timetoeat;
 	int				timetosleep;
 	int				mealnbr;
 	int				*mealcount;
-	int				*forktab;
-	int				philid;
 	long			t_zero;
-	pthread_t		*tid;
-	long			*lasteat;
 	int				end;
+	pthread_t		*tid;
 	pthread_mutex_t	*forkmutex;
-	pthread_mutex_t	endmutex;
 	pthread_mutex_t	display;
-	pthread_mutex_t	idmutex;
-	pthread_mutex_t	lasteatmutex;
-	pthread_mutex_t	meals;
+	pthread_mutex_t	start;
+	t_philo			*philo;
 }		t_data;
 
 #endif

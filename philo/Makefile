@@ -39,5 +39,3 @@ re:
 
 
 .PHONY: clean fclean re all
-
-.SILENT:
